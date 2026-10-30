@@ -36,7 +36,7 @@ export const packageCatalog = [
     category: "Werkzeuge",
     platforms: {
       win32: { manager: "winget", packageId: "7zip.7zip" },
-      linux: { manager: "apt", packageId: "7zip", distributions: ["debian", "ubuntu"] }
+      linux: { manager: "apt", packageId: "p7zip-full", distributions: ["debian", "ubuntu"] }
     }
   }
 ];
