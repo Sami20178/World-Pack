@@ -31,7 +31,7 @@ test("read-only API prototype", async t => {
     const body = await response.json();
     assert.equal(response.status, 200);
     assert.equal(body.status, "ok");
-    assert.equal(body.mode, "read-only-prototype");
+    assert.equal(body.mode, "confirmed-package-installation");
   });
 
   await t.test("platform endpoint reports installation disabled", async () => {
@@ -88,7 +88,17 @@ test("read-only API prototype", async t => {
     assert.equal(response.status, 404);
   });
 
-  await t.test("write methods are rejected", async () => {
+  await t.test("installation requires explicit confirmation and valid origin", async () => {
+    const headers = { Origin: "http://127.0.0.1:5173", "Content-Type": "application/json" };
+    const missing = await fetch(base + "/api/v1/install", { method: "POST", headers, body: JSON.stringify({ ids: ["git"] }) });
+    assert.equal(missing.status, 400);
+    const unknown = await fetch(base + "/api/v1/install", { method: "POST", headers, body: JSON.stringify({ ids: ["not-a-real-package"], confirmation: "INSTALLIEREN" }) });
+    assert.equal(unknown.status, 400);
+    const wrongOrigin = await fetch(base + "/api/v1/install", { method: "POST", headers: { ...headers, Origin: "https://example.invalid" }, body: JSON.stringify({ ids: ["git"], confirmation: "INSTALLIEREN" }) });
+    assert.equal(wrongOrigin.status, 403);
+  });
+
+  await t.test("unsupported write methods are rejected", async () => {
     const response = await fetch(base + "/api/v1/services", { method: "POST" });
     assert.equal(response.status, 405);
   });
