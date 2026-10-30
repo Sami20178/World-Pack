@@ -151,7 +151,7 @@ const server = http.createServer(async (req, res) => {
     }
     const commandPreview = manager === "apt"
       ? "sudo apt-get install -- " + selected.map(item => item.packageId).join(" ")
-      : "winget install --exact " + selected.map(item => "--id " + item.packageId).join(" ");
+      : selected.map(item => "winget install --exact --id " + item.packageId).join(" && ");
     sendJson(res, 200, {
       readOnly: true,
       executable: false,
