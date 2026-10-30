@@ -2,8 +2,31 @@
 
 World Pack is the service and installation backend for a cross-platform desktop environment.
 
+## Phase 1 prototype
+This milestone provides a local read-only API for health, host platform information, and service-list inspection. It does not install packages, change services, or require administrator/root privileges.
+
+## Requirements
+- Node.js 20 or newer
+- Windows 10/11 or Linux (Ubuntu/Debian are the initial Linux targets)
+
+## Run locally
+```sh
+npm install
+npm run check
+npm test
+npm start
+```
+The API listens only on `http://127.0.0.1:4317`.
+
+## API
+- `GET /api/v1/health` — server health and prototype mode.
+- `GET /api/v1/platform` — operating system, release, architecture, and detected Linux distribution.
+- `GET /api/v1/services` — read-only service list (Windows Service Control Manager query or Linux systemd query).
+
+Only GET and OPTIONS are accepted. The API binds to loopback, limits browser access to the configured UI origin, and returns no-store responses.
+
 ## Repository responsibility
-This repository contains the Node.js control plane, update metadata, service orchestration APIs, platform adapters, and installer integration. The desktop UI and product documentation live in [World-Pack-Source-Code](https://github.com/Sami20178/World-Pack-Source-Code).
+This repository contains the Node.js control plane, platform adapters, and installer integration. The desktop UI lives in [World-Pack-Source-Code](https://github.com/Sami20178/World-Pack-Source-Code).
 
 ## Planned platform support
 - **Windows 10/11:** Windows Service integration and supported installer/package-manager adapters.
@@ -11,15 +34,10 @@ This repository contains the Node.js control plane, update metadata, service orc
 - **Android integrations:** optional connection to a properly licensed Android environment. Google Play services are not redistributed by World Pack.
 
 ## Safety model
-- Never silently elevate privileges or run installers as administrator/root.
-- Show package, publisher, source, permissions, and actions before installation.
-- Require explicit confirmation for install, update, removal, and service changes.
-- Verify signatures/checksums where upstream packages provide them.
-- Do not execute arbitrary downloaded EXE, shell, or package scripts.
-- Keep platform-specific operations behind adapters.
-
-## Initial architecture
-See [docs/SERVER-ARCHITECTURE.md](docs/SERVER-ARCHITECTURE.md). The server is planned as a local-first control plane with authenticated IPC/API access, a module registry, package catalog, update checks, and platform adapters.
+- No silent elevation or arbitrary shell commands.
+- No installation, removal, or service changes in Phase 1.
+- Explicit approval and operating-system privilege prompts are required for future write operations.
+- Verify package provenance and integrity before future installation.
 
 ## Development status
-**Foundation / planning stage.** This repository is being prepared on the world-pack-foundation branch. No operating-system services or installers are installed by this documentation commit.
+**Phase 1 — read-only prototype.** Package installation, service changes, updates, and desktop packaging are not implemented yet.
