@@ -28,6 +28,8 @@ async function getPlatform() {
   const platform = process.platform;
   let distribution = null;
   if (platform === "linux") distribution = await linuxDistribution();
+  const compatiblePackages = getCompatiblePackages(platform, distribution);
+  const installationEnabled = compatiblePackages.length > 0 && ["win32", "linux"].includes(platform);
   return {
     platform,
     platformName: ({ win32: "Windows", linux: "Linux", darwin: "macOS" })[platform] || platform,
@@ -36,8 +38,8 @@ async function getPlatform() {
     distribution,
     adapters: {
       serviceInspection: ["win32", "linux"].includes(platform),
-      packageInspection: ["win32", "linux"].includes(platform),
-      installationEnabled: false,
+      packageInspection: compatiblePackages.length > 0,
+      installationEnabled,
       serviceChangesEnabled: false
     }
   };
@@ -201,7 +203,7 @@ const server = http.createServer(async (req, res) => {
     const packages = getCompatiblePackages(platform.platform, platform.distribution);
     sendJson(res, 200, {
       readOnly: true,
-      installationEnabled: false,
+      installationEnabled: platform.adapters.installationEnabled,
       platform: platform.platform,
       distribution: platform.distribution?.id || null,
       packageManager: packages[0]?.manager || null,
@@ -256,7 +258,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, HOST, () => {
   console.log(`World Pack Server listening at http://${HOST}:${PORT}`);
-  console.log("Package installation requires explicit UI confirmation; service changes remain disabled.");
+  console.log("Package installation is limited to the curated catalog and explicit UI confirmation; service changes remain disabled.");
 });
 
 function shutdown() {
