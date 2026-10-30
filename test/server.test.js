@@ -51,6 +51,38 @@ test("read-only API prototype", async t => {
     assert.ok(Array.isArray(body.services));
   });
 
+  await t.test("package catalog contains only supported metadata", async () => {
+    const response = await fetch(base + "/api/v1/packages");
+    const body = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(body.readOnly, true);
+    assert.equal(body.installationEnabled, false);
+    assert.ok(Array.isArray(body.packages));
+    for (const item of body.packages) {
+      assert.ok(item.id);
+      assert.ok(item.packageId);
+      assert.ok(["apt", "winget"].includes(item.manager));
+    }
+  });
+
+  await t.test("install plan is preview-only and validates package IDs", async () => {
+    const catalogResponse = await fetch(base + "/api/v1/packages");
+    const catalog = await catalogResponse.json();
+    if (catalog.packages.length) {
+      const id = catalog.packages[0].id;
+      const response = await fetch(base + "/api/v1/install-plan?ids=" + encodeURIComponent(id));
+      const body = await response.json();
+      assert.equal(response.status, 200);
+      assert.equal(body.readOnly, true);
+      assert.equal(body.executable, false);
+      assert.equal(body.installationEnabled, false);
+      assert.equal(body.packages.length, 1);
+      assert.ok(body.commandPreview);
+    }
+    const invalid = await fetch(base + "/api/v1/install-plan?ids=not-a-real-package");
+    assert.equal(invalid.status, 400);
+  });
+
   await t.test("unknown routes return 404", async () => {
     const response = await fetch(base + "/api/v1/not-a-route");
     assert.equal(response.status, 404);
