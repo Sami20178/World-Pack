@@ -19,12 +19,18 @@ npm start
 The API listens only on `http://127.0.0.1:4317`.
 
 ## API
+- `GET /api/v1/storage` — read-only storage capacity for accessible system and removable volumes.
 - `GET /api/v1/health` — server health and mode.
 - `GET /api/v1/platform` — operating system, release, architecture, detected Linux distribution, and supported adapter capabilities.
 - `GET /api/v1/services` — read-only service list.
 - `GET /api/v1/packages` — curated packages supported by the detected platform and whether the installation adapter is enabled.
 - `GET /api/v1/install-plan?ids=git,curl` — validates selected IDs and returns an install preview.
 - `POST /api/v1/install` — installs up to 10 allowlisted packages only after the UI sends the exact confirmation value and the configured origin.
+
+## Storage reporting
+- Storage reporting is read-only and uses filesystem capacity metadata.
+- On Android/Fire OS, shared internal storage and visible `/storage/*` volumes are reported only when the Node process has permission to read them.
+- The API does not move, delete, or modify files and does not bypass Android scoped-storage permissions.
 
 ## Security boundaries
 - The server binds only to loopback; browser installation requests require the configured UI origin and JSON content type.
