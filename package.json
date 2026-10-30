@@ -1,0 +1,13 @@
+{
+  "name": "world-pack-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local read-only World Pack system information API",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "check": "node --check src/server.js"
+  }
+}
