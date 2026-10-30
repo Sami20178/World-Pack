@@ -2,12 +2,12 @@
 
 World Pack is the service and installation backend for a cross-platform desktop environment.
 
-## Phase 2 prototype
-The backend now provides a curated package catalog and a read-only installation-plan preview for Windows (winget) and Debian/Ubuntu (APT). The preview validates package IDs and shows the native package-manager command, but never executes it. No packages are installed and no services are changed.
+## Phase 3: confirmed package installation
+The backend provides a curated package catalog and validated install previews for Windows (winget) and Debian/Ubuntu (APT). Installation is available only through the dedicated endpoint and only for package IDs in the catalog. The UI asks for two confirmations before sending the request; Linux uses pkexec for the operating-system authorization prompt. The server never accepts arbitrary shell commands.
 
 ## Requirements
 - Node.js 20 or newer
-- Windows 10/11 or Linux (Ubuntu/Debian are the initial Linux targets)
+- Windows 10/11 with winget, or Debian/Ubuntu with APT and pkexec
 
 ## Run locally
 ```sh
@@ -19,27 +19,22 @@ npm start
 The API listens only on `http://127.0.0.1:4317`.
 
 ## API
-- `GET /api/v1/health` — server health and prototype mode.
+- `GET /api/v1/health` — server health and mode.
 - `GET /api/v1/platform` — operating system, release, architecture, and detected Linux distribution.
-- `GET /api/v1/services` — read-only service list (Windows Service Control Manager query or Linux systemd query).
+- `GET /api/v1/services` — read-only service list.
 - `GET /api/v1/packages` — curated packages supported by the detected platform.
-- `GET /api/v1/install-plan?ids=git,curl` — validates selected IDs and returns a non-executable install preview.
+- `GET /api/v1/install-plan?ids=git,curl` — validates selected IDs and returns an install preview.
+- `POST /api/v1/install` — installs up to 10 allowlisted packages only after the UI sends the exact confirmation value and the configured origin.
 
-Only GET and OPTIONS are accepted. The API binds to loopback, limits browser access to the configured UI origin, and returns no-store responses.
+## Security boundaries
+- The server binds only to loopback and accepts browser requests only from the configured UI origin.
+- Installation uses `execFile` with fixed executable names and argument arrays; arbitrary commands are never accepted.
+- Package IDs come exclusively from the curated catalog.
+- Linux elevation is delegated to `pkexec`; Windows uses the native winget process and its own prompts.
+- Service start/stop, package removal, arbitrary scripts, and silent elevation are not implemented.
+- Review package names and IDs before confirming. Package installation changes the operating system.
 
 ## Repository responsibility
-This repository contains the Node.js control plane, platform adapters, and installer integration. The desktop UI lives in [World-Pack-Source-Code](https://github.com/Sami20178/World-Pack-Source-Code).
+This repository contains the Node.js control plane and OS-specific adapters. The desktop UI lives in [World-Pack-Source-Code](https://github.com/Sami20178/World-Pack-Source-Code).
 
-## Planned platform support
-- **Windows 10/11:** Windows Service integration and supported installer/package-manager adapters.
-- **Linux:** systemd service integration and distribution-aware package adapters (initially Debian/Ubuntu).
-- **Android integrations:** optional connection to a properly licensed Android environment. Google Play services are not redistributed by World Pack.
-
-## Safety model
-- No silent elevation or arbitrary shell commands.
-- No installation, removal, or service changes in Phase 1.
-- Explicit approval and operating-system privilege prompts are required for future write operations.
-- Verify package provenance and integrity before future installation.
-
-## Development status
-**Phase 2 — package catalog and preview.** Actual installation, removal, updates, service changes, and desktop packaging are not implemented.
+Google Play services are not redistributed by World Pack; any Android bridge must use a properly licensed environment.
