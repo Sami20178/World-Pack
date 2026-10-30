@@ -34,13 +34,19 @@ test("read-only API prototype", async t => {
     assert.equal(body.mode, "confirmed-package-installation");
   });
 
-  await t.test("platform endpoint reports installation disabled", async () => {
+  await t.test("platform and package endpoints report consistent capabilities", async () => {
     const response = await fetch(base + "/api/v1/platform");
     const body = await response.json();
     assert.equal(response.status, 200);
-    assert.equal(body.adapters.installationEnabled, false);
     assert.equal(body.adapters.serviceChangesEnabled, false);
     assert.ok(body.platform);
+
+    const packagesResponse = await fetch(base + "/api/v1/packages");
+    const packages = await packagesResponse.json();
+    assert.equal(packagesResponse.status, 200);
+    assert.equal(packages.installationEnabled, body.adapters.installationEnabled);
+    assert.equal(body.adapters.packageInspection, packages.packages.length > 0);
+    assert.equal(body.adapters.installationEnabled, packages.packages.length > 0);
   });
 
   await t.test("services endpoint is explicitly read-only", async () => {
@@ -56,7 +62,7 @@ test("read-only API prototype", async t => {
     const body = await response.json();
     assert.equal(response.status, 200);
     assert.equal(body.readOnly, true);
-    assert.equal(body.installationEnabled, false);
+    assert.equal(body.installationEnabled, body.packages.length > 0);
     assert.ok(Array.isArray(body.packages));
     for (const item of body.packages) {
       assert.ok(item.id);
