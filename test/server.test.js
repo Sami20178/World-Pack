@@ -49,6 +49,21 @@ test("read-only API prototype", async t => {
     assert.equal(body.adapters.installationEnabled, packages.packages.length > 0);
   });
 
+  await t.test("storage endpoint reports read-only capacity metadata", async () => {
+    const response = await fetch(base + "/api/v1/storage");
+    const body = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(body.readOnly, true);
+    assert.ok(Array.isArray(body.storages));
+    for (const volume of body.storages) {
+      assert.equal(typeof volume.label, "string");
+      assert.ok(["internal", "removable"].includes(volume.kind));
+      assert.ok(Number.isFinite(volume.totalBytes));
+      assert.ok(Number.isFinite(volume.availableBytes));
+      assert.ok(Number.isFinite(volume.usedPercent));
+    }
+  });
+
   await t.test("services endpoint is explicitly read-only", async () => {
     const response = await fetch(base + "/api/v1/services");
     const body = await response.json();
