@@ -20,14 +20,15 @@ The API listens only on `http://127.0.0.1:4317`.
 
 ## API
 - `GET /api/v1/health` — server health and mode.
-- `GET /api/v1/platform` — operating system, release, architecture, and detected Linux distribution.
+- `GET /api/v1/platform` — operating system, release, architecture, detected Linux distribution, and supported adapter capabilities.
 - `GET /api/v1/services` — read-only service list.
-- `GET /api/v1/packages` — curated packages supported by the detected platform.
+- `GET /api/v1/packages` — curated packages supported by the detected platform and whether the installation adapter is enabled.
 - `GET /api/v1/install-plan?ids=git,curl` — validates selected IDs and returns an install preview.
 - `POST /api/v1/install` — installs up to 10 allowlisted packages only after the UI sends the exact confirmation value and the configured origin.
 
 ## Security boundaries
-- The server binds only to loopback and accepts browser requests only from the configured UI origin.
+- The server binds only to loopback; browser installation requests require the configured UI origin and JSON content type.
+- Capability flags in the platform and package endpoints are derived from the same detected compatible-package catalog.
 - Installation uses `execFile` with fixed executable names and argument arrays; arbitrary commands are never accepted.
 - Package IDs come exclusively from the curated catalog.
 - Linux elevation is delegated to `pkexec`; Windows uses the native winget process and its own prompts.
