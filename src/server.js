@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { getCompatiblePackages } from "./package-catalog.js";
+import { getVirtualizationStatus } from "./virtualization.js";
 
 const execFileAsync = promisify(execFile);
 const HOST = "127.0.0.1";
@@ -263,7 +264,7 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, 200, await listServices(), origin);
     return;
   }
-  if (url.pathname === "/api/v1/storage") {
+  if (url.pathname === "/api/v1/virtualization") {\n    sendJson(res, 200, await getVirtualizationStatus(), origin);\n    return;\n  }\n  if (url.pathname === "/api/v1/storage") {
     sendJson(res, 200, await getStorage(), origin);
     return;
   }
