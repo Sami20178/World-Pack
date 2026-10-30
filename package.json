@@ -4,11 +4,13 @@
   "private": true,
   "description": "World Pack local Node.js package and system service API",
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "check": "node --check src/server.js",
+    "check": "node --check src/server.js && node --check src/virtualization.js",
     "test": "node --test"
   }
 }
