@@ -8,6 +8,7 @@ import { getCompatiblePackages } from "./package-catalog.js";
 const execFileAsync = promisify(execFile);
 const HOST = "127.0.0.1";
 const PORT = Number(process.env.WORLD_PACK_PORT || 4317);
+const INSTALL_TIMEOUT_MS = 10 * 60 * 1000;
 const ALLOWED_ORIGIN = process.env.WORLD_PACK_UI_ORIGIN || "http://127.0.0.1:5173";
 
 async function linuxDistribution() {
@@ -67,6 +68,36 @@ async function listServices() {
   }
 }
 
+
+async function readJson(req) {
+  let raw = "";
+  for await (const chunk of req) {
+    raw += chunk;
+    if (raw.length > 8192) throw new Error("Request body is too large.");
+  }
+  return JSON.parse(raw || "{}");
+}
+
+async function installPackages(selected) {
+  if (process.platform === "linux") {
+    const ids = selected.map(item => item.packageId);
+    const { stdout, stderr } = await execFileAsync("pkexec", ["apt-get", "install", "-y", "--", ...ids],
+      { timeout: INSTALL_TIMEOUT_MS, maxBuffer: 2 * 1024 * 1024, windowsHide: true });
+    return { manager: "apt", output: [stdout, stderr].filter(Boolean).join("\n").slice(-12000) };
+  }
+  if (process.platform === "win32") {
+    const outputs = [];
+    for (const item of selected) {
+      const { stdout, stderr } = await execFileAsync("winget",
+        ["install", "--exact", "--id", item.packageId, "--accept-source-agreements", "--accept-package-agreements"],
+        { timeout: INSTALL_TIMEOUT_MS, maxBuffer: 2 * 1024 * 1024, windowsHide: true });
+      outputs.push(stdout, stderr);
+    }
+    return { manager: "winget", output: outputs.filter(Boolean).join("\n").slice(-12000) };
+  }
+  throw new Error("Installation is not supported on this operating system.");
+}
+
 function sendJson(res, status, data, origin) {
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
@@ -89,7 +120,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "OPTIONS") {
     res.writeHead(204, {
       "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
       "Access-Control-Max-Age": "600",
       "Vary": "Origin"
@@ -99,13 +130,62 @@ const server = http.createServer(async (req, res) => {
   }
 
   const url = new URL(req.url || "/", "http://127.0.0.1");
+
+  if (url.pathname === "/api/v1/install" && req.method === "POST") {
+    if (origin !== ALLOWED_ORIGIN || req.headers["content-type"]?.split(";")[0] !== "application/json") {
+      sendJson(res, 403, { error: "Installation requests must come from the configured World Pack UI." }, null);
+      return;
+    }
+    let body;
+    try { body = await readJson(req); }
+    catch {
+      sendJson(res, 400, { error: "Ungültige oder zu große JSON-Anfrage." }, origin);
+      return;
+    }
+    if (body.confirmation !== "INSTALLIEREN" || !Array.isArray(body.ids) || !body.ids.length || body.ids.length > 10) {
+      sendJson(res, 400, { error: "Wähle höchstens 10 Pakete und bestätige mit INSTALLIEREN." }, origin);
+      return;
+    }
+    const platform = await getPlatform();
+    const compatible = getCompatiblePackages(platform.platform, platform.distribution);
+    const byId = new Map(compatible.map(item => [item.id, item]));
+    const unknown = body.ids.filter(id => typeof id !== "string" || !byId.has(id));
+    if (unknown.length) {
+      sendJson(res, 400, { error: "Nicht unterstützte oder unbekannte Paket-IDs.", unknown }, origin);
+      return;
+    }
+    const selected = [...new Set(body.ids)].map(id => byId.get(id));
+    if (!selected.length || selected.some(item => item.manager !== selected[0].manager)) {
+      sendJson(res, 400, { error: "Die Paketauswahl ist ungültig oder verwendet mehrere Paketmanager." }, origin);
+      return;
+    }
+    try {
+      const result = await installPackages(selected);
+      sendJson(res, 200, {
+        success: true,
+        manager: result.manager,
+        installedPackageIds: selected.map(item => item.id),
+        output: result.output,
+        message: "Der Paketmanager hat den Installationsvorgang beendet. Prüfe die angezeigte Ausgabe."
+      }, origin);
+    } catch (error) {
+      const detail = error.code === "ENOENT"
+        ? "Der erforderliche Paketmanager oder die Berechtigungsabfrage ist nicht verfügbar."
+        : error.killed
+          ? "Die Installation hat das Zeitlimit überschritten."
+          : "Die Installation wurde abgebrochen oder ist fehlgeschlagen. Prüfe die Berechtigungsabfrage und den Paketmanager.";
+      sendJson(res, 500, { success: false, error: detail }, origin);
+    }
+    return;
+  }
+
   if (req.method !== "GET") {
-    sendJson(res, 405, { error: "Only GET requests are available in this prototype." }, origin);
+    sendJson(res, 405, { error: "Diese Route unterstützt diese HTTP-Methode nicht." }, origin);
     return;
   }
 
   if (url.pathname === "/api/v1/health") {
-    sendJson(res, 200, { status: "ok", name: "World Pack Server", version: "0.1.0", mode: "read-only-prototype" }, origin);
+    sendJson(res, 200, { status: "ok", name: "World Pack Server", version: "0.2.0", mode: "confirmed-package-installation" }, origin);
     return;
   }
   if (url.pathname === "/api/v1/platform") {
@@ -176,7 +256,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, HOST, () => {
   console.log(`World Pack Server listening at http://${HOST}:${PORT}`);
-  console.log("Read-only mode: installations and service changes are disabled.");
+  console.log("Package installation requires explicit UI confirmation; service changes remain disabled.");
 });
 
 function shutdown() {
