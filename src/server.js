@@ -3,14 +3,12 @@ import os from "node:os";
 import fs from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { getCompatiblePackages } from "./package-catalog.js";
 
 const execFileAsync = promisify(execFile);
 const HOST = "127.0.0.1";
 const PORT = Number(process.env.WORLD_PACK_PORT || 4317);
 const ALLOWED_ORIGIN = process.env.WORLD_PACK_UI_ORIGIN || "http://127.0.0.1:5173";
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function linuxDistribution() {
   try {
@@ -34,7 +32,6 @@ async function getPlatform() {
     platformName: ({ win32: "Windows", linux: "Linux", darwin: "macOS" })[platform] || platform,
     release: os.release(),
     architecture: process.arch,
-    hostname: os.hostname(),
     distribution,
     adapters: {
       serviceInspection: ["win32", "linux"].includes(platform),
@@ -117,6 +114,61 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === "/api/v1/services") {
     sendJson(res, 200, await listServices(), origin);
+    return;
+  }
+  if (url.pathname === "/api/v1/packages") {
+    const platform = await getPlatform();
+    const packages = getCompatiblePackages(platform.platform, platform.distribution);
+    sendJson(res, 200, {
+      readOnly: true,
+      installationEnabled: false,
+      platform: platform.platform,
+      distribution: platform.distribution?.id || null,
+      packageManager: packages[0]?.manager || null,
+      packages
+    }, origin);
+    return;
+  }
+  if (url.pathname === "/api/v1/install-plan") {
+    const requested = (url.searchParams.get("ids") || "").split(",").map(value => value.trim()).filter(Boolean);
+    if (!requested.length || requested.length > 20) {
+      sendJson(res, 400, { error: "Bitte mindestens ein Paket und höchstens 20 Paket-IDs auswählen." }, origin);
+      return;
+    }
+    const platform = await getPlatform();
+    const compatible = getCompatiblePackages(platform.platform, platform.distribution);
+    const byId = new Map(compatible.map(item => [item.id, item]));
+    const unknown = requested.filter(id => !byId.has(id));
+    if (unknown.length) {
+      sendJson(res, 400, { error: "Nicht unterstützte oder unbekannte Paket-IDs.", unknown }, origin);
+      return;
+    }
+    const selected = [...new Set(requested)].map(id => byId.get(id));
+    const manager = selected[0].manager;
+    if (selected.some(item => item.manager !== manager)) {
+      sendJson(res, 400, { error: "Pakete mit unterschiedlichen Paketmanagern können nicht gemeinsam geplant werden." }, origin);
+      return;
+    }
+    const commandPreview = manager === "apt"
+      ? "sudo apt-get install -- " + selected.map(item => item.packageId).join(" ")
+      : "winget install --exact " + selected.map(item => "--id " + item.packageId).join(" ");
+    sendJson(res, 200, {
+      readOnly: true,
+      executable: false,
+      installationEnabled: false,
+      title: "Installationsvorschau",
+      platform: platform.platform,
+      distribution: platform.distribution?.id || null,
+      packageManager: manager,
+      packages: selected,
+      steps: [
+        "Paketquellen und Paket-IDs vor einer späteren Installation erneut prüfen.",
+        "Benötigte Abhängigkeiten durch den nativen Paketmanager ermitteln lassen.",
+        "Vor jeder Installation eine ausdrückliche Bestätigung einholen."
+      ],
+      commandPreview,
+      notice: "Dies ist nur eine Vorschau. World Pack führt diesen Befehl nicht aus und verändert dein System nicht."
+    }, origin);
     return;
   }
   sendJson(res, 404, { error: "Route not found." }, origin);
