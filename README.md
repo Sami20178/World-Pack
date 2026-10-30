@@ -2,8 +2,8 @@
 
 World Pack is the service and installation backend for a cross-platform desktop environment.
 
-## Phase 1 prototype
-This milestone provides a local read-only API for health, host platform information, and service-list inspection. It does not install packages, change services, or require administrator/root privileges.
+## Phase 2 prototype
+The backend now provides a curated package catalog and a read-only installation-plan preview for Windows (winget) and Debian/Ubuntu (APT). The preview validates package IDs and shows the native package-manager command, but never executes it. No packages are installed and no services are changed.
 
 ## Requirements
 - Node.js 20 or newer
@@ -22,6 +22,8 @@ The API listens only on `http://127.0.0.1:4317`.
 - `GET /api/v1/health` — server health and prototype mode.
 - `GET /api/v1/platform` — operating system, release, architecture, and detected Linux distribution.
 - `GET /api/v1/services` — read-only service list (Windows Service Control Manager query or Linux systemd query).
+- `GET /api/v1/packages` — curated packages supported by the detected platform.
+- `GET /api/v1/install-plan?ids=git,curl` — validates selected IDs and returns a non-executable install preview.
 
 Only GET and OPTIONS are accepted. The API binds to loopback, limits browser access to the configured UI origin, and returns no-store responses.
 
@@ -40,4 +42,4 @@ This repository contains the Node.js control plane, platform adapters, and insta
 - Verify package provenance and integrity before future installation.
 
 ## Development status
-**Phase 1 — read-only prototype.** Package installation, service changes, updates, and desktop packaging are not implemented yet.
+**Phase 2 — package catalog and preview.** Actual installation, removal, updates, service changes, and desktop packaging are not implemented.
