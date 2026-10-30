@@ -35,6 +35,7 @@ The API listens only on `http://127.0.0.1:4317`.
 ## API
 
 - `GET /api/v1/storage` — read-only storage capacity for accessible volumes.
+- `GET /api/v1/virtualization` — read-only QEMU host detection and Android 9 / Kindle Fire OS 7 compatibility profiles.
 - `GET /api/v1/health` — server health and mode.
 - `GET /api/v1/platform` — OS, release, architecture, distribution, and adapter capabilities.
 - `GET /api/v1/services` — read-only service list.
@@ -53,4 +54,4 @@ The API listens only on `http://127.0.0.1:4317`.
 
 ## Status
 
-The current backend is not a privileged OS service and does not yet implement a module runtime, VM orchestrator, firmware image builder, or CFW test runner. The VM/CFW lab is currently a documented plan only.
+The current backend is not a privileged OS service and does not yet implement a module runtime, VM orchestrator, firmware image builder, or CFW test runner. The QEMU endpoint only detects installed QEMU executables; it does not launch virtual machines. The VM/CFW lab is currently a documented plan only.
