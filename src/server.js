@@ -71,6 +71,71 @@ async function listServices() {
 }
 
 
+
+function formatStorageEntry(mountPath, label, kind) {
+  return fs.statfs(mountPath).then(stats => {
+    const blockSize = Number(stats.bsize);
+    const totalBytes = blockSize * Number(stats.blocks);
+    const availableBytes = blockSize * Number(stats.bavail);
+    const usedBytes = Math.max(0, totalBytes - availableBytes);
+    return {
+      label, kind, totalBytes, availableBytes, usedBytes,
+      usedPercent: totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 100) : 0,
+      available: true
+    };
+  }).catch(() => null);
+}
+
+async function getStorage() {
+  const entries = [];
+  const seen = new Set();
+  const add = async (mountPath, label, kind) => {
+    if (!mountPath || seen.has(mountPath)) return;
+    seen.add(mountPath);
+    const item = await formatStorageEntry(mountPath, label, kind);
+    if (item) entries.push(item);
+  };
+
+  await add("/", "Systemspeicher", "internal");
+
+  if (process.platform === "linux") {
+    const isAndroid = Boolean(process.env.ANDROID_ROOT || process.env.ANDROID_DATA);
+    if (isAndroid) {
+      await add("/storage/emulated/0", "Interner gemeinsamer Speicher", "internal");
+      try {
+        const dirs = await fs.readdir("/storage", { withFileTypes: true });
+        for (const dir of dirs) {
+          if (!dir.isDirectory() || dir.name === "emulated" || dir.name === "self") continue;
+          await add(`/storage/${dir.name}`, "SD-Karte · " + dir.name, "removable");
+        }
+      } catch {}
+    } else {
+      for (const base of ["/media", "/run/media", "/mnt"]) {
+        try {
+          const dirs = await fs.readdir(base, { withFileTypes: true });
+          for (const dir of dirs) {
+            if (dir.isDirectory()) await add(`${base}/${dir.name}`, "Zusätzlicher Speicher · " + dir.name, "removable");
+          }
+        } catch {}
+      }
+    }
+  } else if (process.platform === "win32") {
+    const root = process.cwd().slice(0, 3);
+    await add(root, "Systemlaufwerk " + root, "internal");
+  } else if (process.platform === "darwin") {
+    try {
+      const dirs = await fs.readdir("/Volumes", { withFileTypes: true });
+      for (const dir of dirs) if (dir.isDirectory()) await add(`/Volumes/${dir.name}`, dir.name, "removable");
+    } catch {}
+  }
+
+  return {
+    readOnly: true,
+    source: process.platform === "linux" && (process.env.ANDROID_ROOT || process.env.ANDROID_DATA) ? "android-filesystem" : "host-filesystem",
+    storages: entries
+  };
+}
+
 async function readJson(req) {
   let raw = "";
   for await (const chunk of req) {
@@ -196,6 +261,10 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === "/api/v1/services") {
     sendJson(res, 200, await listServices(), origin);
+    return;
+  }
+  if (url.pathname === "/api/v1/storage") {
+    sendJson(res, 200, await getStorage(), origin);
     return;
   }
   if (url.pathname === "/api/v1/packages") {
